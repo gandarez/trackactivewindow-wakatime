@@ -125,20 +125,20 @@ namespace WakaTime
 
         private void EventCallback(IntPtr hWinEventHook, uint iEvent, IntPtr hWnd, int idObject, int idChild, int dwEventThread, int dwmsEventTime)
         {
-            var process = GetActiveProcessInfo();
-            if (process == null) return;            
-            HandleActivity(process[0], process[1]);
+            var windowTitle = GetActiveProcessInfo();
+            if (windowTitle == null) return;            
+            HandleActivity(windowTitle);
         }
 
-        static string[] GetActiveProcessInfo()
+        static string GetActiveProcessInfo()
         {
             try
             {
                 var hwnd = NativeMethods.GetForegroundWindow();
                 uint pid;
                 NativeMethods.GetWindowThreadProcessId(hwnd, out pid);
-                var p = Process.GetProcessById((int)pid);                
-                return new[] { p.MainWindowTitle, Path.GetFileName(p.MainModule.FileName).ToLower() };
+                var p = Process.GetProcessById((int)pid);               
+                return p.MainWindowTitle;
             }
             catch (Exception ex)
             {
@@ -147,10 +147,10 @@ namespace WakaTime
             }
         }
 
-        private void HandleActivity(string windowTitle, string processName)
+        private void HandleActivity(string windowTitle)
         {
             if (string.IsNullOrEmpty(windowTitle)) return;
-
+                        
             Task.Run(() =>
             {
                 lock (ThreadLock)
@@ -158,7 +158,7 @@ namespace WakaTime
                     if (_lastWindowTitle != null && !EnoughTimePassed() && windowTitle.Equals(_lastWindowTitle))
                         return;
 
-                    SendHeartbeat(windowTitle, processName);
+                    SendHeartbeat(windowTitle);
                     _lastWindowTitle = windowTitle;
                     _lastHeartbeat = DateTime.UtcNow;
                 }
@@ -170,7 +170,7 @@ namespace WakaTime
             return _lastHeartbeat < DateTime.UtcNow.AddMinutes(-1);
         }
 
-        public static void SendHeartbeat(string windowTitle, string processName)
+        public static void SendHeartbeat(string windowTitle)
         {
             PythonCliParameters.Key = ApiKey;
             PythonCliParameters.Entity = windowTitle;
@@ -192,31 +192,15 @@ namespace WakaTime
             }
             else
                 Logger.Error("Could not send heartbeat because python is not installed");
-        }
-
-        private ToolStripMenuItem ToolStripMenuItemWithHandler(
-            string displayText, int enabledCount, int disabledCount, EventHandler eventHandler)
-        {
-            var item = new ToolStripMenuItem(displayText);
-            if (eventHandler != null) { item.Click += eventHandler; }
-
-            //item.Image = (enabledCount > 0 && disabledCount > 0) ? Properties.Resources.signal_yellow
-            //             : (enabledCount > 0) ? Properties.Resources.signal_green
-            //             : (disabledCount > 0) ? Properties.Resources.signal_red
-            //             : null;
-            item.Image = null;
-            //item.ToolTipText = (enabledCount > 0 && disabledCount > 0) ?
-            //                                     string.Format("{0} enabled, {1} disabled", enabledCount, disabledCount)
-            //             : (enabledCount > 0) ? string.Format("{0} enabled", enabledCount)
-            //             : (disabledCount > 0) ? string.Format("{0} disabled", disabledCount)
-            //             : "";
-            item.ToolTipText = "";
-            return item;            
-        }
+        }       
 
         public ToolStripMenuItem ToolStripMenuItemWithHandler(string displayText, EventHandler eventHandler)
         {
-            return ToolStripMenuItemWithHandler(displayText, 0, 0, eventHandler);
+            var item = new ToolStripMenuItem(displayText);
+            if (eventHandler != null) { item.Click += eventHandler; }
+            item.Image = null;
+            item.ToolTipText = string.Empty;
+            return item;
         }
 
         private void SetNotifyIconToolTip()
