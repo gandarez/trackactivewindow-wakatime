@@ -48,8 +48,16 @@ namespace WakaTime
                 // Make sure python is installed
                 if (!PythonManager.IsPythonInstalled())
                 {
-                    var url = PythonManager.PythonDownloadUrl;
-                    Downloader.DownloadPython(url, WakaTimeConstants.UserConfigDir);
+                    var dialogResult = MessageBox.Show(@"Let's download and install Python now?", @"WakaTime requires Python", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (dialogResult == DialogResult.Yes)
+                    {
+                        var url = PythonManager.PythonDownloadUrl;
+                        Downloader.DownloadPython(url, WakaTimeConstants.UserConfigDir);
+                    }
+                    else
+                        MessageBox.Show(
+                            @"Please install Python (https://www.python.org/downloads/) and restart Visual Studio to enable the WakaTime plugin.",
+                            @"WakaTime", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
                 if (!DoesCliExist() || !IsCliLatestVersion())
@@ -126,7 +134,7 @@ namespace WakaTime
         private void EventCallback(IntPtr hWinEventHook, uint iEvent, IntPtr hWnd, int idObject, int idChild, int dwEventThread, int dwmsEventTime)
         {
             var windowTitle = GetActiveProcessInfo();
-            if (windowTitle == null) return;            
+            if (windowTitle == null) return;
             HandleActivity(windowTitle);
         }
 
@@ -137,7 +145,7 @@ namespace WakaTime
                 var hwnd = NativeMethods.GetForegroundWindow();
                 uint pid;
                 NativeMethods.GetWindowThreadProcessId(hwnd, out pid);
-                var p = Process.GetProcessById((int)pid);               
+                var p = Process.GetProcessById((int)pid);
                 return p.MainWindowTitle;
             }
             catch (Exception ex)
@@ -150,7 +158,7 @@ namespace WakaTime
         private void HandleActivity(string windowTitle)
         {
             if (string.IsNullOrEmpty(windowTitle)) return;
-                        
+
             Task.Run(() =>
             {
                 lock (ThreadLock)
@@ -174,7 +182,7 @@ namespace WakaTime
         {
             PythonCliParameters.Key = ApiKey;
             PythonCliParameters.Entity = windowTitle;
-            PythonCliParameters.Plugin = $"{WakaTimeConstants.PluginName}/{_version}";            
+            PythonCliParameters.Plugin = $"{WakaTimeConstants.PluginName}/{_version}";
 
             var pythonBinary = PythonManager.GetPython();
             if (pythonBinary != null)
@@ -189,10 +197,13 @@ namespace WakaTime
                 }
                 else
                     process.RunInBackground();
+
+                if (!process.Success)
+                    Logger.Error($"Could not send heartbeat: {process.Error}");
             }
             else
                 Logger.Error("Could not send heartbeat because python is not installed");
-        }       
+        }
 
         public ToolStripMenuItem ToolStripMenuItemWithHandler(string displayText, EventHandler eventHandler)
         {
